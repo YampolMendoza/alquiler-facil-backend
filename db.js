@@ -1,19 +1,16 @@
-const sqlite3 = require("sqlite3").verbose();
-const path = require("path");
+const { Pool } = require("pg");
 
-const dbPath = path.join(__dirname, "../database/alquileres.db");
-
-const db = new sqlite3.Database(dbPath, (err) => {
-    if (err) {
-        console.error("❌ Error al conectar DB", err.message);
-    } else {
-        console.log("🗄️ Base de datos SQLite conectada");
-    }
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false },
 });
 
-db.run(`
-    CREATE TABLE IF NOT EXISTS alquileres (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+// 🔥 CREAR TABLA AUTOMÁTICAMENTE
+(async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS alquileres (
+        id SERIAL PRIMARY KEY,
         tipo TEXT,
         distrito TEXT,
         direccion TEXT,
@@ -22,7 +19,12 @@ db.run(`
         condiciones TEXT,
         telefono TEXT,
         fecha TEXT
-    )
-`);
+      );
+    `);
+    console.log("✅ Tabla alquileres lista");
+  } catch (err) {
+    console.error("❌ Error creando tabla:", err.message);
+  }
+})();
 
-module.exports = db;
+module.exports = pool;

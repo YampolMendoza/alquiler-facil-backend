@@ -1,10 +1,8 @@
 const express = require("express");
 const cors = require("cors");
-const db = require("./db");
+const pool = require("./db");
 
 const app = express();
-
-// 🔥 IMPORTANTE PARA RENDER
 const PORT = process.env.PORT || 3000;
 
 app.use(cors());
@@ -15,64 +13,74 @@ app.get("/", (req, res) => {
   res.send("API Alquiler Fácil Perú funcionando 🚀");
 });
 
-// ❤️ HEALTH CHECK (OBLIGATORIO PARA RENDER)
+// ❤️ HEALTH CHECK (Render)
 app.get("/healthz", (req, res) => {
   res.status(200).send("OK");
 });
 
 // 🏠 PUBLICAR ALQUILER
-app.post("/alquileres", (req, res) => {
-  const {
-    tipo,
-    distrito,
-    direccion,
-    piso,
-    precio,
-    condiciones,
-    telefono
-  } = req.body;
+app.post("/alquileres", async (req, res) => {
+  try {
+    const {
+      tipo,
+      distrito,
+      direccion,
+      piso,
+      precio,
+      condiciones,
+      telefono
+    } = req.body;
 
-  if (!tipo || !distrito || !direccion || !precio || !telefono) {
-    return res.status(400).json({ error: "Datos incompletos" });
-  }
-
-  const fecha = new Date().toLocaleDateString("es-PE");
-
-  const sql = `
-    INSERT INTO alquileres
-    (tipo, distrito, direccion, piso, precio, condiciones, telefono, fecha)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `;
-
-  db.run(
-    sql,
-    [tipo, distrito, direccion, piso, precio, condiciones, telefono, fecha],
-    function (err) {
-      if (err) {
-        console.error("❌ DB Error:", err.message);
-        return res.status(500).json({ error: "Error al guardar alquiler" });
-      }
-
-      res.status(201).json({
-        mensaje: "Alquiler guardado",
-        id: this.lastID
-      });
+    if (!tipo || !distrito || !direccion || !precio || !telefono) {
+      return res.status(400).json({ error: "Datos incompletos" });
     }
-  );
+
+    const fecha = new Date().toLocaleDateString("es-PE");
+
+    const query = `
+      INSERT INTO alquileres
+      (tipo, distrito, direccion, piso, precio, condiciones, telefono, fecha)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+      RETURNING id
+    `;
+
+    const values = [
+      tipo,
+      distrito,
+      direccion,
+      piso,
+      precio,
+      condiciones,
+      telefono,
+      fecha
+    ];
+
+    const result = await pool.query(query, values);
+
+    res.status(201).json({
+      mensaje: "Alquiler guardado",
+      id: result.rows[0].id
+    });
+
+  } catch (error) {
+    console.error("❌ DB Error:", error);
+    res.status(500).json({ error: "Error al guardar alquiler" });
+  }
 });
 
 // 📋 LISTAR ALQUILERES
-app.get("/alquileres", (req, res) => {
-  db.all("SELECT * FROM alquileres ORDER BY id DESC", [], (err, rows) => {
-    if (err) {
-      console.error("❌ DB Error:", err.message);
-      return res.status(500).json({ error: "Error al obtener alquileres" });
-    }
-    res.json(rows);
-  });
+app.get("/alquileres", async (req, res) => {
+  try {
+    const result = await pool.query(
+      "SELECT * FROM alquileres ORDER BY id DESC"
+    );
+    res.json(result.rows);
+  } catch (error) {
+    console.error("❌ DB Error:", error);
+    res.status(500).json({ error: "Error al obtener alquileres" });
+  }
 });
 
-// 🚀 INICIAR SERVIDOR (RENDER USA ESTE PUERTO)
 app.listen(PORT, () => {
   console.log(`🚀 Servidor corriendo en el puerto ${PORT}`);
 });
